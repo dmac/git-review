@@ -21,8 +21,6 @@ git review [options] <author>
 Options:
 EOS
   opt :num_commits, "Number of commits to review", :default => 1
-  opt :watch, "Set up a watch queue for an author", :default => false
-  opt :status, "View your watch queues", :default => false
   opt :paged, "Review commits in a paged view instead of in an editor", :default => false
   opt :keep, "Keep your review files instead of deleting them", :default => false
 end
@@ -36,17 +34,6 @@ end
 author = ARGV[0]
 ENV["LESS"] = "-XRS"
 STDOUT.sync = true
-
-if opts[:watch]
-  puts "You are now watching #{author}"
-  puts "git review --status to view your watch queues"
-  exit 0
-end
-
-if opts[:status]
-  puts "philc has 5 new commits"
-  exit 0
-end
 
 smtp = Net::SMTP.new "smtp.gmail.com", 587
 smtp.enable_starttls
@@ -70,7 +57,7 @@ commits.keys.each do |commit|
     wc = `git whatchanged -n 1 --oneline #{commit}`
     commits[commit] = wc.match(/ (.*)\n/)[1]
     files = wc.split("\n")[1..-1].map do |line|
-      line[line.rindex("/") + 1..-1]
+      line.match(/\s(\S+)$/)[1]
     end
     system("echo '#{commit} #{commits[commit]}\n' >> review_#{commit}.txt")
     files.each { |file| system("echo '#{file}\n' >> review_#{commit}.txt") }
@@ -102,5 +89,5 @@ commits.keys.each do |commit|
   end
 end
 
-system("rm -f diff_*.tmp")
-system("rm -f review_*.txt") unless opts[:keep]
+system("rm -f diff_*.tmp*")
+system("rm -f review_*.txt*") unless opts[:keep]
