@@ -25,69 +25,94 @@ EOS
   opt :keep, "Keep your review files instead of deleting them", :default => false
 end
 
-opts = Trollop::with_standard_exception_handling parser do
+@opts = Trollop::with_standard_exception_handling parser do
   opts = parser.parse ARGV
   raise Trollop::HelpNeeded if ARGV.empty?
   opts
 end
 
-author = ARGV[0]
-ENV["LESS"] = "-XRS"
-STDOUT.sync = true
+def initialize_env
+  ENV["LESS"] = "-XRS"
+  STDOUT.sync = true
+end
 
-smtp = Net::SMTP.new "smtp.gmail.com", 587
-smtp.enable_starttls
+def initialize_smtp(server = "smtp.gmail.com", port = 587)
+  @smtp = Net::SMTP.new server, port
+  @smtp.enable_starttls
+end
 
-log = `git log -n 1 --author=#{author}`
-reviewer_name = `git config user.name`
-reviewer_email = `git config user.email`.strip
-author_name = log.match(/Author: (.+) </)[1]
-author_email = log.match(/Author: .* <(.+)>/)[1]
-password = nil
+def initialize_reviewer_and_author_info
+  @author = ARGV[0]
+  log = `git log -n 1 --author=#{@author}`
+  @reviewer_name = `git config user.name`
+  @reviewer_email = `git config user.email`.strip
+  @author_name = log.match(/Author: (.+) </)[1]
+  @author_email = log.match(/Author: .* <(.+)>/)[1]
+  @password = nil
+end
 
-log = `git log -n #{opts[:num_commits]} --oneline --author=#{author}`
-commits = Hash[*log.split("\n").collect { |line| [line.split[0], nil] }.flatten]
+def cleanup
+  system("rm -f diff_*.tmp*")
+  system("rm -f review_*.txt*") unless @opts[:keep]
+end
 
-commits.keys.each do |commit|
+def get_commit_info(hash)
+  wc = `git whatchanged -n 1 --oneline #{hash}`
+  subject = wc.match(/ (.*)\n/)[1]
+  files = wc.split("\n")[1..-1].map do |line|
+    line.match(/\s(\S+)$/)[1]
+  end
+  return { :subject => subject, :files => files }
+end
+
+def send_email(subject, body)
+  @password ||= ask("Password: ") { |q| q.echo = false }
+  print "Sending mail..."
+  message = "From: #{@reviewer_name} <#{@reviewer_email}>\n"
+  message << "To: #{@author_name} <#{@author_email}>\n"
+  message << "Subject: Re: #{hash} by #{@author_name} #{subject}\n\n"
+  message << body
+  @smtp.start("smtp.gmail.com", "#{@reviewer_email}", "#{@password}", :plain) do |smtp|
+    smtp.send_message(message, "#{@reviewer_email}", "#{@author_email}")
+  end
+  puts "\nReview sent!"
+end
+
+def process_commit(hash)
   # TODO: open your own editor with convenient filenames?
-  if opts[:paged]
-    system("clear; git show #{commit}")
-
+  if @opts[:paged]
+    system("clear; git show #{hash}")
   else
-    wc = `git whatchanged -n 1 --oneline #{commit}`
-    commits[commit] = wc.match(/ (.*)\n/)[1]
-    files = wc.split("\n")[1..-1].map do |line|
-      line.match(/\s(\S+)$/)[1]
+    commit_info = get_commit_info(hash)
+    unless File.exists?("review_#{hash}.txt")
+      system("echo '#{hash} #{commit_info[:subject]}\n' >> review_#{hash}.txt")
+      commit_info[:files].each { |filename| system("echo '#{filename}\n' >> review_#{hash}.txt") }
     end
-    system("echo '#{commit} #{commits[commit]}\n' >> review_#{commit}.txt")
-    files.each { |file| system("echo '#{file}\n' >> review_#{commit}.txt") }
 
-    system("git show #{commit} > diff_#{commit}.tmp")
-    system("vi -c ':wincmd l' -O diff_#{commit}.tmp review_#{commit}.txt")
+    system("git show #{hash} > diff_#{hash}.tmp")
+    system("vi -c ':wincmd l' -O diff_#{hash}.tmp review_#{hash}.txt")
 
-
-    print "Send review to #{author_name} <#{author_email}>? (Y/n): "
+    print "Send review to #{@author_name} <#{@author_email}>? (Y/n): "
     input = STDIN.gets.chomp
 
     if ["", "y", "Y"].include? input
-      password ||= ask("Password: ") { |q| q.echo = false }
-      print "Sending mail..."
-
-      review = ""
-      File.open("review_#{commit}.txt", "r") { |file| review = file.read }
-      next if review.empty?
-
-      message = "From: #{reviewer_name} <#{reviewer_email}>\n"
-      message << "To: #{author_name} <#{author_email}>\n"
-      message << "Subject: Re: #{commit} by #{author_name} #{commits[commit]}\n\n"
-      message << review
-      smtp.start("smtp.gmail.com", "#{reviewer_email}", "#{password}", :plain) do |smtp|
-        smtp.send_message(message, "#{reviewer_email}", "#{author_email}")
-      end
-      puts "\nReview sent!"
+      body = ""
+      File.open("review_#{hash}.txt", "r") { |file| body = file.read }
+      send_email(commit_info[:subject], body) unless body.empty?
     end
   end
 end
 
-system("rm -f diff_*.tmp*")
-system("rm -f review_*.txt*") unless opts[:keep]
+if __FILE__ == $0
+  initialize_env
+  initialize_smtp
+  initialize_reviewer_and_author_info
+
+  log = `git log -n #{@opts[:num_commits]} --oneline --author=#{@author}`
+  commits = log.split("\n").map { |line| line.split[0] }
+  commits.each do |hash|
+    process_commit(hash)
+  end
+
+  cleanup
+end
