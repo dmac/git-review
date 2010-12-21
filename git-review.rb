@@ -6,10 +6,9 @@ require "highline/import"
 
 # TODO
 # - make watching and unwatching perform faster
-# - be able to see how many reviews are in each watch queue (git review)
 # - ability to mail to additional email addresses
 
-parser = Trollop::Parser.new do
+@opts = Trollop::options do
   banner <<-EOS
 A code review utility for git.
 
@@ -18,17 +17,11 @@ git review [options] <author>
 
 Options:
 EOS
-  opt :num_commits, "Number of commits to review", :default => 1
+  opt :num_commits, "Number of commits to review", :type => :int
   opt :watch, "Add <author> to your watch list", :default => false
   opt :unwatch, "Remove <author> from your watch list", :default => false
   opt :paged, "Review commits in a paged view instead of in an editor", :default => false
   opt :keep, "Keep your review files instead of deleting them", :default => false
-end
-
-@opts = Trollop::with_standard_exception_handling parser do
-  opts = parser.parse ARGV
-  raise Trollop::HelpNeeded if ARGV.empty?
-  opts
 end
 
 def initialize_env
@@ -48,6 +41,8 @@ end
 def initialize_reviewer_and_author_info
   begin
     @author = ARGV[0]
+    return unless @author
+
     log = `git log -n 1 --author=#{@author}`
     @reviewer_name = `git config user.name`
     @reviewer_email = `git config user.email`.strip
@@ -89,9 +84,32 @@ def remove_author_from_watch_list
   puts "removed #{@author} from your watch list"
 end
 
+def num_commits_for_author(author)
+  watch_text = ""
+  File.open(@watch_file, "r") { |file| watch_text = file.read }
+  commit = watch_text.match(/#{author} (.+)/)[1]
+  num_commits = `git log --oneline --author=#{author}`.split("\n").map { |line| line.split.first }.index(commit) + 1
+end
+
+def show_watches
+  File.open(@watch_file).each do |line|
+    author, commit = line.split
+    num_commits = num_commits_for_author(author)
+    puts "#{author} has #{num_commits} #{num_commits == 1 ? "commit" : "commits"} to review"
+  end
+end
+
 def cleanup
   system("rm -f #{@workspace}/diff_*.tmp*")
   system("rm -f #{@workspace}/review_*.txt*") unless @opts[:keep]
+end
+
+def get_commit_hashes
+  num_commits = num_commits_for_author(@author)
+  log = `git log -n #{num_commits} --oneline --author=#{@author}`
+  commits = log.split("\n").map { |line| line.split[0] }.reverse
+  commits = commits[0..@opts[:num_commits] - 1] if @opts[:num_commits]
+  commits
 end
 
 def get_commit_info(hash)
@@ -148,13 +166,14 @@ if __FILE__ == $0
   initialize_smtp
   initialize_reviewer_and_author_info
 
-  if @opts[:watch]
+  if !@author
+    show_watches
+  elsif @opts[:watch]
     add_author_to_watch_list
   elsif @opts[:unwatch]
     remove_author_from_watch_list
   else
-    log = `git log -n #{@opts[:num_commits]} --oneline --author=#{@author}`
-    commits = log.split("\n").map { |line| line.split[0] }
+    commits = get_commit_hashes
     commits.each do |hash|
       process_commit(hash)
     end
