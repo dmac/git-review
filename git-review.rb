@@ -5,11 +5,9 @@ require "net/smtp"
 require "highline/import"
 
 # TODO
-# - refactor
 # - set up "watches" (git review watch <author>)
 # - be able to see how many reviews are in each watch queue (git review)
 # - ability to mail to additional email addresses
-# - don't save tmp files in top level git directory (/tmp? ~/.git-review?)
 
 parser = Trollop::Parser.new do
   banner <<-EOS
@@ -34,6 +32,8 @@ end
 def initialize_env
   ENV["LESS"] = "-XRS"
   STDOUT.sync = true
+  @workspace = "#{File::expand_path("~")}/.git-review"
+  system("mkdir -p #{@workspace}")
 end
 
 def initialize_smtp(server = "smtp.gmail.com", port = 587)
@@ -52,8 +52,8 @@ def initialize_reviewer_and_author_info
 end
 
 def cleanup
-  system("rm -f diff_*.tmp*")
-  system("rm -f review_*.txt*") unless @opts[:keep]
+  system("rm -f #{@workspace}/diff_*.tmp*")
+  system("rm -f #{@workspace}/review_*.txt*") unless @opts[:keep]
 end
 
 def get_commit_info(hash)
@@ -84,20 +84,22 @@ def process_commit(hash)
     system("clear; git show #{hash}")
   else
     commit_info = get_commit_info(hash)
-    unless File.exists?("review_#{hash}.txt")
-      system("echo '#{hash} #{commit_info[:subject]}\n' >> review_#{hash}.txt")
-      commit_info[:files].each { |filename| system("echo '#{filename}\n' >> review_#{hash}.txt") }
+    review_file = "#{@workspace}/review_#{hash}.txt"
+    diff_file = "#{@workspace}/diff_#{hash}.tmp"
+    unless File.exists?(review_file)
+      system("echo '#{hash} #{commit_info[:subject]}\n' >> #{review_file}")
+      commit_info[:files].each { |filename| system("echo '#{filename}\n' >> #{review_file}") }
     end
 
-    system("git show #{hash} > diff_#{hash}.tmp")
-    system("vi -c ':wincmd l' -O diff_#{hash}.tmp review_#{hash}.txt")
+    system("git show #{hash} > #{diff_file}")
+    system("vi -c ':wincmd l' -O #{diff_file} #{review_file}")
 
     print "Send review to #{@author_name} <#{@author_email}>? (Y/n): "
     input = STDIN.gets.chomp
 
     if ["", "y", "Y"].include? input
       body = ""
-      File.open("review_#{hash}.txt", "r") { |file| body = file.read }
+      File.open(review_file, "r") { |file| body = file.read }
       send_email(commit_info[:subject], body) unless body.empty?
     end
   end
