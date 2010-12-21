@@ -4,6 +4,13 @@ require "trollop"
 require "net/smtp"
 require "highline/import"
 
+# TODO
+# - set up "watches"
+# - be able to see how many reviews are in each watch queue
+# - ability to mail to other email addresses
+# - don't save tmp files in top level directory (/tmp? ~/.git-review?)
+# - refactor
+
 parser = Trollop::Parser.new do
   banner <<-EOS
 A code review utility for git.
@@ -14,6 +21,8 @@ git review [options] <author>
 Options:
 EOS
   opt :num_commits, "Number of commits to review", :default => 1
+  opt :watch, "Set up a watch queue for an author", :default => false
+  opt :status, "View your watch queues", :default => false
   opt :paged, "Review commits in a paged view instead of in an editor", :default => false
   opt :keep, "Keep your review files instead of deleting them", :default => false
 end
@@ -27,6 +36,17 @@ end
 author = ARGV[0]
 ENV["LESS"] = "-XRS"
 STDOUT.sync = true
+
+if opts[:watch]
+  puts "You are now watching #{author}"
+  puts "git review --status to view your watch queues"
+  exit 0
+end
+
+if opts[:status]
+  puts "philc has 5 new commits"
+  exit 0
+end
 
 smtp = Net::SMTP.new "smtp.gmail.com", 587
 smtp.enable_starttls
