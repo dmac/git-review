@@ -28,11 +28,15 @@ author = ARGV[0]
 ENV["LESS"] = "-XRS"
 STDOUT.sync = true
 
+smtp = Net::SMTP.new "smtp.gmail.com", 587
+smtp.enable_starttls
+
 log = `git log -n 1 --author=#{author}`
 reviewer_name = `git config user.name`
 reviewer_email = `git config user.email`.strip
 author_name = log.match(/Author: (.+) </)[1]
 author_email = log.match(/Author: .* <(.+)>/)[1]
+password = nil
 
 log = `git log -n #{opts[:num_commits]} --oneline --author=#{author}`
 commits = Hash[*log.split("\n").collect { |line| [line.split[0], nil] }.flatten]
@@ -53,31 +57,29 @@ commits.keys.each do |commit|
 
     system("git show #{commit} > diff_#{commit}.tmp")
     system("vi -c ':wincmd l' -O diff_#{commit}.tmp review_#{commit}.txt")
-  end
-end
 
-print "Send reviews to #{author_name} <#{author_email}>? (Y/n): "
-input = STDIN.gets.chomp
 
-if ["", "y", "Y"].include? input
-  password = ask("Password: ") { |q| q.echo = false }
-  print "Sending mail"
+    print "Send review to #{author_name} <#{author_email}>? (Y/n): "
+    input = STDIN.gets.chomp
 
-  smtp = Net::SMTP.new "smtp.gmail.com", 587
-  smtp.enable_starttls
+    if ["", "y", "Y"].include? input
+      password ||= ask("Password: ") { |q| q.echo = false }
+      print "Sending mail..."
 
-  commits.each do |commit, subject|
-    print "."
+      review = ""
+      File.open("review_#{commit}.txt", "r") { |file| review = file.read }
+      next if review.empty?
 
-    message = "From: #{reviewer_name} <#{reviewer_email}>\n"
-    message << "To: #{author_name} <#{author_email}>\n"
-    message << "Subject: Re: #{subject} by #{author_name}\n\n"
-    File.open("review_#{commit}.txt", "r") { |file| message << file.read }
-    smtp.start("smtp.gmail.com", "#{reviewer_email}", "#{password}", :plain) do |smtp|
-      smtp.send_message(message, "#{reviewer_email}", "#{author_email}")
+      message = "From: #{reviewer_name} <#{reviewer_email}>\n"
+      message << "To: #{author_name} <#{author_email}>\n"
+      message << "Subject: Re: #{commits[commit]} by #{author_name}\n\n"
+      message << review
+      smtp.start("smtp.gmail.com", "#{reviewer_email}", "#{password}", :plain) do |smtp|
+        smtp.send_message(message, "#{reviewer_email}", "#{author_email}")
+      end
+      puts "\nReview sent!"
     end
   end
-  puts "\nReviews sent!"
 end
 
 system("rm -f diff_*.tmp")
