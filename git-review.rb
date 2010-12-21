@@ -5,7 +5,7 @@ require "net/smtp"
 require "highline/import"
 
 # TODO
-# - set up "watches" (git review watch <author>)
+# - make watching and unwatching perform faster
 # - be able to see how many reviews are in each watch queue (git review)
 # - ability to mail to additional email addresses
 
@@ -19,6 +19,8 @@ git review [options] <author>
 Options:
 EOS
   opt :num_commits, "Number of commits to review", :default => 1
+  opt :watch, "Add <author> to your watch list", :default => false
+  opt :unwatch, "Remove <author> from your watch list", :default => false
   opt :paged, "Review commits in a paged view instead of in an editor", :default => false
   opt :keep, "Keep your review files instead of deleting them", :default => false
 end
@@ -33,7 +35,9 @@ def initialize_env
   ENV["LESS"] = "-XRS"
   STDOUT.sync = true
   @workspace = "#{File::expand_path("~")}/.git-review"
+  @watch_file = "#{@workspace}/watches.txt"
   system("mkdir -p #{@workspace}")
+  system("touch #{@watch_file}")
 end
 
 def initialize_smtp(server = "smtp.gmail.com", port = 587)
@@ -42,13 +46,47 @@ def initialize_smtp(server = "smtp.gmail.com", port = 587)
 end
 
 def initialize_reviewer_and_author_info
-  @author = ARGV[0]
-  log = `git log -n 1 --author=#{@author}`
-  @reviewer_name = `git config user.name`
-  @reviewer_email = `git config user.email`.strip
-  @author_name = log.match(/Author: (.+) </)[1]
-  @author_email = log.match(/Author: .* <(.+)>/)[1]
-  @password = nil
+  begin
+    @author = ARGV[0]
+    log = `git log -n 1 --author=#{@author}`
+    @reviewer_name = `git config user.name`
+    @reviewer_email = `git config user.email`.strip
+    @author_name = log.match(/Author: (.+) </)[1]
+    @author_email = log.match(/Author: .* <(.+)>/)[1]
+    @password = nil
+  rescue
+    puts "Error: Unknown author specified"
+    exit 1
+  end
+end
+
+def add_author_to_watch_list
+  File.open(@watch_file).each do |line|
+    author, commit = line.split
+    if author == @author
+      puts "you are already watching #{@author}"
+      return
+    end
+  end
+  log = `git log --oneline -n 10 --author=#{@author}`
+  unless log.empty?
+    hash = log.split("\n").last.split[0]
+    File.open(@watch_file, "a") { |file| file.puts "#{@author} #{hash}"}
+    puts "added #{@author} to your watch list"
+  end
+end
+
+def remove_author_from_watch_list
+  watch_text = ""
+  File.open(@watch_file, "r") { |file| watch_text = file.read }
+  unless watch_text.match(/^#{@author}\s/)
+    puts "you are not watching #{@author}"
+    return
+  end
+  watch_text = watch_text.gsub(/^#{@author}.*$\n/, "").strip
+  system("echo '#{watch_text}' > #{@watch_file}")
+  File.delete(@watch_file) if watch_text.empty?
+  puts "removed #{@author} from your watch list"
 end
 
 def cleanup
@@ -110,10 +148,16 @@ if __FILE__ == $0
   initialize_smtp
   initialize_reviewer_and_author_info
 
-  log = `git log -n #{@opts[:num_commits]} --oneline --author=#{@author}`
-  commits = log.split("\n").map { |line| line.split[0] }
-  commits.each do |hash|
-    process_commit(hash)
+  if @opts[:watch]
+    add_author_to_watch_list
+  elsif @opts[:unwatch]
+    remove_author_from_watch_list
+  else
+    log = `git log -n #{@opts[:num_commits]} --oneline --author=#{@author}`
+    commits = log.split("\n").map { |line| line.split[0] }
+    commits.each do |hash|
+      process_commit(hash)
+    end
   end
 
   cleanup
