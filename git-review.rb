@@ -5,11 +5,11 @@ require "net/smtp"
 require "highline/import"
 
 # TODO
-# - set up "watches"
-# - be able to see how many reviews are in each watch queue
-# - ability to mail to other email addresses
-# - don't save tmp files in top level directory (/tmp? ~/.git-review?)
 # - refactor
+# - set up "watches" (git review watch <author>)
+# - be able to see how many reviews are in each watch queue (git review)
+# - ability to mail to additional email addresses
+# - don't save tmp files in top level git directory (/tmp? ~/.git-review?)
 
 parser = Trollop::Parser.new do
   banner <<-EOS
@@ -92,7 +92,7 @@ commits.keys.each do |commit|
 
       message = "From: #{reviewer_name} <#{reviewer_email}>\n"
       message << "To: #{author_name} <#{author_email}>\n"
-      message << "Subject: Re: #{commits[commit]} by #{author_name}\n\n"
+      message << "Subject: Re: #{commit} by #{author_name} #{commits[commit]}\n\n"
       message << review
       smtp.start("smtp.gmail.com", "#{reviewer_email}", "#{password}", :plain) do |smtp|
         smtp.send_message(message, "#{reviewer_email}", "#{author_email}")
