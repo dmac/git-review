@@ -5,6 +5,8 @@ require "net/smtp"
 require "highline/import"
 
 # TODO
+# - ability to set last-seen commit manually
+# - support for multiple repositories
 # - make watching and unwatching perform faster
 # - ability to mail to additional email addresses
 
@@ -63,7 +65,7 @@ def add_author_to_watch_list
       return
     end
   end
-  log = `git log --oneline -n 10 --author=#{@author}`
+  log = `git log --oneline -n 11 --author=#{@author}`
   unless log.empty?
     hash = log.split("\n").last.split[0]
     File.open(@watch_file, "a") { |file| file.puts "#{@author} #{hash}"}
@@ -88,7 +90,7 @@ def num_commits_for_author(author)
   watch_text = ""
   File.open(@watch_file, "r") { |file| watch_text = file.read }
   commit = watch_text.match(/#{author} (.+)/)[1]
-  num_commits = `git log --oneline --author=#{author}`.split("\n").map { |line| line.split.first }.index(commit) + 1
+  num_commits = `git log --oneline --author=#{author}`.split("\n").map { |line| line.split.first }.index(commit)
 end
 
 def show_watches
@@ -119,6 +121,19 @@ def get_commit_info(hash)
     line.match(/\s(\S+)$/)[1]
   end
   return { :subject => subject, :files => files }
+end
+
+def set_author_hash(author, hash)
+  watch_text = ""
+  File.open(@watch_file, "r") { |file| watch_text = file.read }
+  watch_text = watch_text.gsub(/^#{author}.*$/, "#{author} #{hash}").strip
+  system("echo '#{watch_text}' > #{@watch_file}")
+end
+
+def update_watch_list
+  if @last_seen_hash
+    set_author_hash(@author, @last_seen_hash)
+  end
 end
 
 def send_email(subject, body)
@@ -159,6 +174,7 @@ def process_commit(hash)
       send_email(commit_info[:subject], body) unless body.empty?
     end
   end
+  @last_seen_hash = hash
 end
 
 if __FILE__ == $0
@@ -177,6 +193,7 @@ if __FILE__ == $0
     commits.each do |hash|
       process_commit(hash)
     end
+    update_watch_list
   end
 
   cleanup
