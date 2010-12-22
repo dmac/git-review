@@ -1,0 +1,22 @@
+A code review utility for git.
+
+To use git-review, place it in your path or set a git alias:
+  git config --global alias.review = "!/path/to/git-review"
+
+Usage: git review [options] [author]
+
+Common tasks:
+  View unreviewed commit count:   git review
+  Watch an author:                git review -w <author>
+  Review one commit in vi:        git review -n 1 <author>
+  Quickly review all commits:     git review -p <author>
+
+Options:
+  --num-commits, -n <i>:   Number of commits to review
+   --set-commit, -s <s>:   Set <commit> as your last-seen commit for <author>
+            --watch, -w:   Add <author> to your watch list
+          --unwatch, -u:   Remove <author> from your watch list
+            --paged, -p:   Review commits in a paged view instead of in an editor
+             --keep, -k:   Keep your review files instead of deleting them
+             --help, -h:   Show this message
+
