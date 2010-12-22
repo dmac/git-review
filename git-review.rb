@@ -56,8 +56,8 @@ def initialize_reviewer_and_author_info
     @author_email = log.match(/Author: .* <(.+)>/)[1]
     @password = nil
   rescue
-    puts "Error: Unknown author specified"
-    exit 1
+    puts "unknown author specified"
+    exit
   end
 end
 
@@ -102,7 +102,12 @@ def num_commits_for_author(author)
     seen_commits = commits.size
     watch_text = ""
     File.open(@watch_file, "r") { |file| watch_text = file.read }
-    commit = watch_text.match(/#{author} (.+)/)[1]
+    begin
+      commit = watch_text.match(/#{author} (.+)/)[1]
+    rescue
+      puts "you are not watching #{author}"
+      exit
+    end
     commits = `git log --oneline -n #{limit} --author=#{author}`.split("\n").map { |line| line.split.first }
     num_commits = commits.index(commits.select { |prefix| commit.match(/^#{prefix}/) }.first)
   end
