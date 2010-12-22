@@ -3,6 +3,10 @@ A code review utility for git.
 To use git-review, place it in your path or set a git alias:
   git config --global alias.review = "!/path/to/git-review"
 
+Required gems:
+  trollop
+  highline
+
 Usage: git review [options] [author]
 
 Common tasks:
