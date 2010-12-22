@@ -12,8 +12,13 @@ require "highline/import"
   banner <<-EOS
 A code review utility for git.
 
-Usage:
-git review [options] <author>
+Usage: git review [options] [author]
+
+Common tasks:
+  View unreviewed commit count:   git review
+  Watch an author:                git review -w <author>
+  Review one commit in vi:        git review -n 1 <author>
+  Quickly review all commits:     git review -p <author>
 
 Options:
 EOS
