@@ -5,7 +5,6 @@ require "net/smtp"
 require "highline/import"
 
 # TODO
-# - support for multiple repositories
 # - make watching and unwatching perform faster
 # - ability to mail to additional email addresses
 
@@ -29,7 +28,7 @@ end
 def initialize_env
   ENV["LESS"] = "-XRS"
   STDOUT.sync = true
-  @workspace = "#{File::expand_path("~")}/.git-review"
+  @workspace = "#{File::expand_path("~")}/.git-review/#{File.basename(Dir.pwd)}"
   @watch_file = "#{@workspace}/watches.txt"
   system("mkdir -p #{@workspace}")
   system("touch #{@watch_file}")
@@ -95,6 +94,11 @@ def num_commits_for_author(author)
 end
 
 def show_watches
+  if File.zero?(@watch_file)
+    puts "you are not watching any authors"
+    puts "watch authors with git review -w <author>"
+    return
+  end
   File.open(@watch_file).each do |line|
     author, commit = line.split
     num_commits = num_commits_for_author(author)
