@@ -86,11 +86,22 @@ def remove_author_from_watch_list
 end
 
 def num_commits_for_author(author)
-  watch_text = ""
-  File.open(@watch_file, "r") { |file| watch_text = file.read }
-  commit = watch_text.match(/#{author} (.+)/)[1]
-  commits = `git log --oneline --author=#{author}`.split("\n").map { |line| line.split.first }
-  num_commits = commits.index(commits.select { |prefix| commit.match(/^#{prefix}/) }.first)
+  limit = 0
+  multiplier = 1
+  num_commits = nil
+  seen_commits = nil
+  commits = []
+  while num_commits.nil? && seen_commits != commits.size
+    limit += 100 * multiplier
+    multiplier += 2
+    seen_commits = commits.size
+    watch_text = ""
+    File.open(@watch_file, "r") { |file| watch_text = file.read }
+    commit = watch_text.match(/#{author} (.+)/)[1]
+    commits = `git log --oneline -n #{limit} --author=#{author}`.split("\n").map { |line| line.split.first }
+    num_commits = commits.index(commits.select { |prefix| commit.match(/^#{prefix}/) }.first)
+  end
+  num_commits
 end
 
 def show_watches
@@ -102,7 +113,11 @@ def show_watches
   File.open(@watch_file).each do |line|
     author, commit = line.split
     num_commits = num_commits_for_author(author)
-    puts "#{author} has #{num_commits} #{num_commits == 1 ? "commit" : "commits"} to review"
+    if num_commits.nil?
+      puts "#{author}'s last seen commit (#{commit}) not found, set with git review <author> -s <commit>"
+    else
+      puts "#{author} has #{num_commits} #{num_commits == 1 ? "commit" : "commits"} to review"
+    end
   end
 end
 
@@ -170,7 +185,7 @@ def process_commit(hash)
     system("git show #{hash} > #{diff_file}")
     system("vi -c ':wincmd l' -O #{diff_file} #{review_file}")
 
-    print "Send review to #{@author_name} <#{@author_email}>? (Y/n): "
+    print "Email review to #{@author_name} <#{@author_email}>? (Y/n): "
     input = STDIN.gets.chomp
 
     if ["", "y", "Y"].include? input
