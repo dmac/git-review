@@ -5,7 +5,6 @@ require "net/smtp"
 require "highline/import"
 
 # TODO
-# - ability to set last-seen commit manually
 # - support for multiple repositories
 # - make watching and unwatching perform faster
 # - ability to mail to additional email addresses
@@ -20,6 +19,7 @@ git review [options] <author>
 Options:
 EOS
   opt :num_commits, "Number of commits to review", :type => :int
+  opt :set_commit, "Set <commit> as your last-seen commit for <author>", :type => :string
   opt :watch, "Add <author> to your watch list", :default => false
   opt :unwatch, "Remove <author> from your watch list", :default => false
   opt :paged, "Review commits in a paged view instead of in an editor", :default => false
@@ -90,7 +90,8 @@ def num_commits_for_author(author)
   watch_text = ""
   File.open(@watch_file, "r") { |file| watch_text = file.read }
   commit = watch_text.match(/#{author} (.+)/)[1]
-  num_commits = `git log --oneline --author=#{author}`.split("\n").map { |line| line.split.first }.index(commit)
+  commits = `git log --oneline --author=#{author}`.split("\n").map { |line| line.split.first }
+  num_commits = commits.index(commits.select { |prefix| commit.match(/^#{prefix}/) }.first)
 end
 
 def show_watches
@@ -188,6 +189,9 @@ if __FILE__ == $0
     add_author_to_watch_list
   elsif @opts[:unwatch]
     remove_author_from_watch_list
+  elsif @opts[:set_commit]
+    set_author_hash(@author, @opts[:set_commit])
+    puts "set #{@opts[:set_commit]} as last seen commit for #{@author}"
   else
     commits = get_commit_hashes
     commits.each do |hash|
