@@ -5,6 +5,7 @@ require "net/smtp"
 require "highline/import"
 
 # TODO
+# - print helpful message when you try to review and there are no more commits
 # - make watching and unwatching perform faster
 # - ability to mail to additional email addresses
 # - use EDITOR env variable
@@ -180,6 +181,15 @@ def send_email(subject, body)
   puts "\nReview sent!"
 end
 
+def ask_to_send_email(subject, body)
+  print "Email review to #{@author_name} <#{@author_email}>? (Y/n): "
+  input = STDIN.gets.chomp
+
+  if ["", "y", "Y"].include? input
+    send_email(subject, body) unless body.empty?
+  end
+end
+
 def process_commit(hash)
   # TODO: open your own editor with convenient filenames?
   if @opts[:paged]
@@ -188,21 +198,17 @@ def process_commit(hash)
     commit_info = get_commit_info(hash)
     review_file = "#{@workspace}/review_#{hash}.txt"
     diff_file = "#{@workspace}/diff_#{hash}.tmp"
-    unless File.exists?(review_file)
-      system("echo '#{hash} #{commit_info[:subject]}\n' >> #{review_file}")
-      commit_info[:files].each { |filename| system("echo '#{filename}\n' >> #{review_file}") }
-    end
+    system("echo '#{hash} #{commit_info[:subject]}\n' > #{review_file}")
+    commit_info[:files].each { |filename| system("echo '#{filename}\n' >> #{review_file}") }
+    review_file_contents_old = IO.read(review_file)
 
     system("git show #{hash} > #{diff_file}")
-    system("vi -c ':wincmd l' -O #{diff_file} #{review_file}")
+    system("vi -c ':wincmd l' -c 'map q :qa<CR>' -O #{diff_file} #{review_file}")
 
-    print "Email review to #{@author_name} <#{@author_email}>? (Y/n): "
-    input = STDIN.gets.chomp
+    review_file_contents_new = IO.read(review_file)
 
-    if ["", "y", "Y"].include? input
-      body = ""
-      File.open(review_file, "r") { |file| body = file.read }
-      send_email(commit_info[:subject], body) unless body.empty?
+    if review_file_contents_new != review_file_contents_old
+      ask_to_send_email(commit_info[:subject], review_file_contents_new)
     end
   end
   @last_seen_hash = hash
