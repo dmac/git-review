@@ -5,7 +5,6 @@ require "net/smtp"
 require "highline/import"
 
 # TODO
-# - print helpful message when you try to review and there are no more commits
 # - make watching and unwatching perform faster
 # - ability to mail to additional email addresses
 # - use EDITOR env variable
@@ -214,6 +213,18 @@ def process_commit(hash)
   @last_seen_hash = hash
 end
 
+def review_commits
+  commits = get_commit_hashes
+  if commits.empty?
+    puts "#{@author} has no commits to review"
+  else
+    commits.each do |hash|
+      process_commit(hash)
+    end
+    update_watch_list
+  end
+end
+
 if __FILE__ == $0
   initialize_env
   initialize_smtp
@@ -229,11 +240,7 @@ if __FILE__ == $0
     set_author_hash(@author, @opts[:set_commit])
     puts "set #{@opts[:set_commit]} as last seen commit for #{@author}"
   else
-    commits = get_commit_hashes
-    commits.each do |hash|
-      process_commit(hash)
-    end
-    update_watch_list
+    review_commits
   end
 
   cleanup
