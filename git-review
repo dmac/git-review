@@ -33,6 +33,7 @@ end
 
 def initialize_env
   ENV["LESS"] = "-XRS"
+  ENV["PAGER"]= "less -XRS"
   STDOUT.sync = true
   @workspace = "#{File::expand_path("~")}/.git-review/#{File.basename(Dir.pwd)}"
   @watch_file = "#{@workspace}/watches.txt"
