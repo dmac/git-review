@@ -203,7 +203,7 @@ def process_commit(hash)
     review_file_contents_old = IO.read(review_file)
 
     system("git show #{hash} > #{diff_file}")
-    system("vi -c ':wincmd l' -c 'map q :qa<CR>' -O #{diff_file} #{review_file}")
+    system("vi +'map q :qa<CR>' -O #{diff_file} #{review_file}")
 
     review_file_contents_new = IO.read(review_file)
 
