@@ -54,11 +54,10 @@ def initialize_reviewer_and_author_info
     @author = author_from_commit(@opts[:commit]) if @opts[:commit]
     return unless @author
 
-    log = `git log -n 1 --author=#{@author}`
+    author_info = `git log -n 1 --format="%an;%ae" --author=#{@author}`
+    @author_name, @author_email = author_info.strip.split(";")
     @reviewer_name = `git config user.name`
     @reviewer_email = `git config user.email`.strip
-    @author_name = log.match(/Author: (.+) </)[1]
-    @author_email = log.match(/Author: .* <(.+)>/)[1]
     @password = nil
   rescue
     puts "unknown author specified"
@@ -101,26 +100,14 @@ def remove_author_from_watch_list
 end
 
 def num_commits_for_author(author)
-  limit = 0
-  multiplier = 1
-  num_commits = nil
-  seen_commits = nil
-  commits = []
-  while num_commits.nil? && seen_commits != commits.size
-    limit += 100 * multiplier
-    multiplier += 2
-    seen_commits = commits.size
-    watch_text = ""
-    File.open(@watch_file, "r") { |file| watch_text = file.read }
-    begin
-      commit = watch_text.match(/#{author} (.+)/)[1]
-    rescue
-      puts "you are not watching #{author}"
-      exit
-    end
-    commits = `git log --oneline -n #{limit} --author=#{author}`.split("\n").map { |line| line.split.first }
-    num_commits = commits.index(commits.select { |prefix| commit.match(/^#{prefix}/) }.first)
+  watch_text = IO.read(@watch_file)
+  begin
+    commit = watch_text.match(/#{author} (.+)/)[1]
+  rescue
+    puts "you are not watching #{author}"
+    exit
   end
+  num_commits = `git log --oneline --author=#{author} #{commit}..HEAD`.split("\n").size
   num_commits
 end
 
