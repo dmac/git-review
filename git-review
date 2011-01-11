@@ -149,6 +149,8 @@ end
 
 def get_commit_info(hash)
   wc = `git whatchanged -n 1 --oneline #{hash}`
+  return { :subject => "", :files => [] } if wc == "" # May have been a merge
+
   subject = wc.match(/ (.*)\n/)[1]
   files = wc.split("\n")[1..-1].map do |line|
     line.match(/\s(\S+)$/)[1]
