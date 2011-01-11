@@ -195,7 +195,7 @@ end
 def ask_for_additional_email_addresses
   addresses = []
   while true
-    print "Also email to: (Enter to send) "
+    print "Also email to: "
     input = STDIN.gets.chomp
     break if input == ""
     addresses << input
