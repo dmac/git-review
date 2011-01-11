@@ -6,7 +6,6 @@ require "highline/import"
 
 # TODO
 # - make watching and unwatching perform faster
-# - ability to mail to additional email addresses
 # - use EDITOR env variable
 
 @opts = Trollop::options do
@@ -166,15 +165,18 @@ def update_watch_list
   end
 end
 
-def send_email(subject, body)
+def send_email(subject, body, addresses)
   @password ||= ask("Password: ") { |q| q.echo = false }
   print "Sending mail..."
   message = "From: #{@reviewer_name} <#{@reviewer_email}>\n"
-  message << "To: #{@author_name} <#{@author_email}>\n"
+  message << "To: "
+  addresses.each { |address| message << "<#{address}>, " }
+  message << "\n"
+  #message << "To: #{@author_name} <#{@author_email}>\n"
   message << "Subject: Re: #{hash} by #{@author_name} #{subject}\n\n"
   message << body
   @smtp.start("smtp.gmail.com", "#{@reviewer_email}", "#{@password}", :plain) do |smtp|
-    smtp.send_message(message, "#{@reviewer_email}", "#{@author_email}")
+    smtp.send_message(message, "#{@reviewer_email}", addresses)
   end
   puts "\nReview sent!"
 end
@@ -184,8 +186,21 @@ def ask_to_send_email(subject, body)
   input = STDIN.gets.chomp
 
   if ["", "y", "Y"].include? input
-    send_email(subject, body) unless body.empty?
+    addresses = ask_for_additional_email_addresses
+    addresses << @author_email
+    send_email(subject, body, addresses) unless body.empty?
   end
+end
+
+def ask_for_additional_email_addresses
+  addresses = []
+  while true
+    print "Also email to: (Enter to send) "
+    input = STDIN.gets.chomp
+    break if input == ""
+    addresses << input
+  end
+  addresses
 end
 
 def process_commit(hash)
