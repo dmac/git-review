@@ -24,3 +24,8 @@ Options:
              --keep, -k:   Keep your review files instead of deleting them
              --help, -h:   Show this message
 
+Tip: If you add the following line to your .tigrc file, you can enter directly into a code review
+when viewing the diff of a commit by pressing 'e'.
+
+bind diff e !git review -c %(commit)
+
