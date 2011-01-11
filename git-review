@@ -37,7 +37,8 @@ def initialize_env
   ENV["LESS"] = "-XRS"
   ENV["PAGER"]= "less -XRS"
   STDOUT.sync = true
-  @workspace = "#{File::expand_path("~")}/.git-review/#{File.basename(Dir.pwd)}"
+  root_path = `git rev-parse --show-toplevel`.strip
+  @workspace = "#{File::expand_path("~")}/.git-review/#{File.basename(root_path)}"
   @watch_file = "#{@workspace}/watches.txt"
   system("mkdir -p #{@workspace}")
   system("touch #{@watch_file}")
