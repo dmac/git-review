@@ -18,18 +18,19 @@ Usage: git review [options] [author]
 Common tasks:
   View unreviewed commit count:   git review
   Watch an author:                git review -w <author>
-  Review one commit in vi:        git review -n 1 <author>
+  Review next commit by author:   git review -n 1 <author>
   Quickly review all commits:     git review -p <author>
+  Review a specific commit:       git review -c <commit>
 
 Options:
 EOS
-  opt :num_commits, "Number of commits to review", :type => :int
-  opt :set_commit, "Set <commit> as your last-seen commit for <author>", :type => :string
-  opt :commit, "Review a specific <commit> instead of your last-seen commit", :type => :string
-  opt :watch, "Add <author> to your watch list", :default => false
-  opt :unwatch, "Remove <author> from your watch list", :default => false
+  opt :num_commits, "-n <num>: Number of commits to review", :type => :int
+  opt :set_commit, "-s <commit>: Set <commit> as your last-seen commit", :type => :string
+  opt :commit, "-c <commit>: Review <commit> instead of your last-seen commit", :type => :string
+  opt :watch, "Add specified <author> to your watch list", :default => false
+  opt :unwatch, "Remove specified <author> from your watch list", :default => false
   opt :paged, "Review commits in a paged view instead of in an editor", :default => false
-  opt :keep, "Keep your review files instead of deleting them", :default => false
+  opt :keep, "Keep your review files in ~/.git-review/<repository> instead of deleting them", :default => false
 end
 
 def initialize_env
@@ -50,6 +51,7 @@ end
 def initialize_reviewer_and_author_info
   begin
     @author = ARGV[0]
+    @author = author_from_commit(@opts[:commit]) if @opts[:commit]
     return unless @author
 
     log = `git log -n 1 --author=#{@author}`
@@ -62,6 +64,11 @@ def initialize_reviewer_and_author_info
     puts "unknown author specified"
     exit
   end
+end
+
+def author_from_commit(hash)
+  email = `git log -n 1 --format="%ae" #{hash}`
+  return email.match(/(.*)@/)[1]
 end
 
 def add_author_to_watch_list
