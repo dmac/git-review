@@ -173,7 +173,7 @@ def send_email(subject, body, addresses)
   addresses.each { |address| message << "<#{address}>, " }
   message << "\n"
   #message << "To: #{@author_name} <#{@author_email}>\n"
-  message << "Subject: Re: #{hash} by #{@author_name} #{subject}\n\n"
+  message << "Subject: #{subject}\n\n"
   message << body
   @smtp.start("smtp.gmail.com", "#{@reviewer_email}", "#{@password}", :plain) do |smtp|
     smtp.send_message(message, "#{@reviewer_email}", addresses)
@@ -221,7 +221,8 @@ def process_commit(hash)
     review_file_contents_new = IO.read(review_file)
 
     if review_file_contents_new != review_file_contents_old
-      ask_to_send_email(commit_info[:subject], review_file_contents_new)
+      subject = "Re: #{hash} by #{@author_name} #{commit_info[:subject]}"
+      ask_to_send_email(subject, review_file_contents_new)
     end
   end
   @last_seen_hash = hash
