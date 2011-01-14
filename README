@@ -5,9 +5,7 @@ To use git-review, place it in your path or set a git alias:
 
 tig users:
   If you add this line to your .tigrc file:
-
-  bind diff e !git review -c %(commit)
-
+    bind diff e !git review -c %(commit)
   you can enter directly into a code review when viewing
   the diff of a commit by pressing 'e'.
 
