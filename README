@@ -3,6 +3,14 @@ A code review utility for git.
 To use git-review, place it in your path or set a git alias:
   git config --global alias.review = "!/path/to/git-review"
 
+tig users:
+  If you add this line to your .tigrc file:
+
+  bind diff e !git review -c %(commit)
+
+  you can enter directly into a code review when viewing
+  the diff of a commit by pressing 'e'.
+
 Required gems:
   trollop
   highline
@@ -23,9 +31,4 @@ Options:
             --paged, -p:   Review commits in a paged view instead of in an editor
              --keep, -k:   Keep your review files instead of deleting them
              --help, -h:   Show this message
-
-Tip: If you add the following line to your .tigrc file, you can enter directly into a code review
-when viewing the diff of a commit by pressing 'e'.
-
-bind diff e !git review -c %(commit)
 
