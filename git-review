@@ -204,6 +204,8 @@ def ask_for_additional_email_addresses
 end
 
 def process_commit(hash)
+  hash = short_hash(hash) # Use abbreviated hashes for readability
+
   # TODO: open your own editor with convenient filenames?
   if @opts[:paged]
     system("clear; git show #{hash}")
@@ -238,6 +240,10 @@ def review_commits
     end
     update_watch_list
   end
+end
+
+def short_hash(hash)
+  `git log --format="%h" -n 1 #{hash}`.strip
 end
 
 if __FILE__ == $0
